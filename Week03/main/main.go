@@ -111,7 +111,7 @@ signal cancelled
 exit status 1
 
 
-键盘：Ctrl+Z
+键盘：Ctrl+C
 
 PS C:\Users\yeahe83\Documents\Dev\demo\Go-000\Week03\main> go run main.go
 Got signal: interrupt
