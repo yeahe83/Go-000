@@ -1,8 +1,8 @@
 package biz
 
 import (
-	data "example.com/myapp/internal/data"
-	model "example.com/myapp/internal/model"
+	data "example.com/myapp/internal/user/data"
+	model "example.com/myapp/internal/user/model"
 )
 
 type UserManager struct {

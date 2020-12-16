@@ -6,10 +6,18 @@
 package main
 
 import (
-	"example.com/myapp/internal/biz"
-	"example.com/myapp/internal/data"
+	"context"
+	"errors"
+	"example.com/myapp/internal/user/biz"
+	"example.com/myapp/internal/user/data"
 	"fmt"
+	"golang.org/x/sync/errgroup"
+	"io"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 // Injectors from main.go:
@@ -29,23 +37,84 @@ func initUserManager() (*biz.UserManager, error) {
 // main.go:
 
 func main() {
-	mgr, err := initUserManager()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+
+		srv := &http.Server{Addr: ":8080"}
+
+		userHandler := func(w http.ResponseWriter, req *http.Request) {
+
+			mgr, err := initUserManager()
+			if err != nil {
+				log.Fatalln(err.Error())
+			}
+
+			userID := req.URL.Query().Get("id")
+			user, err := mgr.GetUser(userID)
+			if err != nil {
+				io.WriteString(w, err.Error())
+			} else {
+				io.WriteString(w, user.Name)
+			}
+
+		}
+		http.HandleFunc("/user", userHandler)
+
+		go func() {
+			<-ctx.Done()
+			srv.Shutdown(context.TODO())
+		}()
+
+		err := srv.ListenAndServe()
+		if err != nil {
+			fmt.Println(err)
+			cancel()
+			return err
+		}
+
+		return nil
+
+	})
+
+	g.Go(func() error {
+
+		c := make(chan os.Signal, 4)
+		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
+
+		select {
+
+		case <-ctx.Done():
+			fmt.Println("signal cancelled")
+			return errors.New("signal cancelled")
+		case s := <-c:
+			signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
+			fmt.Println("Got signal:", s)
+			cancel()
+			return errors.New(fmt.Sprint("Got signal:", s))
+
+		}
+
+	})
+
+	err := g.Wait()
 	if err != nil {
-		log.Fatalln(err.Error())
+		log.Fatal(err)
 	}
-	user, err := mgr.GetUser("1")
-	if err != nil {
-		log.Fatalln(err.Error())
-	}
-	fmt.Println("user.Name = ", user.Name)
+
 }
 
-// provider
+// NewUserManager provider to UserManager
 func NewUserManager(dao *data.UserDao) (*biz.UserManager, error) {
 	mgr := biz.UserManager{Dao: dao}
 	return &mgr, nil
 }
 
+// NewUserDao provider to UserDao
 func NewUserDao() (*data.UserDao, error) {
 	dao := data.UserDao{}
 	return &dao, nil

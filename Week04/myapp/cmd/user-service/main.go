@@ -23,33 +23,104 @@ https://blog.csdn.net/uisoul/article/details/108776073
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"example.com/myapp/internal/biz"
-	"example.com/myapp/internal/data"
+	"example.com/myapp/internal/user/biz"
+	"example.com/myapp/internal/user/data"
 	"github.com/google/wire"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
-	mgr, err := initUserManager()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+
+		srv := &http.Server{Addr: ":8080"}
+
+		userHandler := func(w http.ResponseWriter, req *http.Request) {
+
+			mgr, err := initUserManager()
+			if err != nil {
+				log.Fatalln(err.Error())
+			}
+
+			userID := req.URL.Query().Get("id")
+			user, err := mgr.GetUser(userID)
+			if err != nil {
+				io.WriteString(w, err.Error())
+			} else {
+				io.WriteString(w, user.Name)
+			}
+
+		}
+
+		http.HandleFunc("/user", userHandler)
+
+		go func() { // 监听ctx的关闭
+			<-ctx.Done() // cancel
+			srv.Shutdown(context.TODO())
+		}()
+
+		err := srv.ListenAndServe()
+		if err != nil {
+			fmt.Println(err)
+			cancel() // to cancel signal
+			return err
+		}
+
+		return nil
+
+	})
+
+	g.Go(func() error {
+
+		// https://golang.google.cn/pkg/os/signal/#example_Notify
+		c := make(chan os.Signal, 4)
+
+		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
+
+		select {
+
+		case <-ctx.Done(): // cancel
+			fmt.Println("signal cancelled")
+			return errors.New("signal cancelled")
+		case s := <-c:
+			signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
+			fmt.Println("Got signal:", s)
+			cancel() // to cancel http.server
+			return errors.New(fmt.Sprint("Got signal:", s))
+
+		}
+
+	})
+
+	err := g.Wait()
 	if err != nil {
-		log.Fatalln(err.Error())
-	}
-	user, err := mgr.GetUser("1")
-	if err != nil {
-		log.Fatalln(err.Error())
+		log.Fatal(err)
 	}
 
-	fmt.Println("user.Name = ", user.Name)
 }
 
-// provider
+// NewUserManager provider to UserManager
 func NewUserManager(dao *data.UserDao) (*biz.UserManager, error) {
 	mgr := biz.UserManager{Dao: dao}
 	return &mgr, nil
 }
 
+// NewUserDao provider to UserDao
 func NewUserDao() (*data.UserDao, error) {
 	dao := data.UserDao{}
 	return &dao, nil
@@ -65,6 +136,9 @@ func initUserManager() (*biz.UserManager, error) {
 PS C:\Users\yeahe83\Documents\dev\demo\Go-000\Week04\myapp\cmd\user-service> wire
 wire: example.com/myapp/cmd/user-service: wrote C:\Users\yeahe83\Documents\dev\demo\Go-000\Week04\myapp\cmd\user-service\wire_gen.go
 PS C:\Users\yeahe83\Documents\dev\demo\Go-000\Week04\myapp\cmd\user-service> go run .\wire_gen.go
-user.Name =  yeahe83
+
+
+http://localhost:8080/user?id=1
+yeahe83
 
 */
