@@ -1,0 +1,24 @@
+syntax = "proto3";
+package analysis.v1;
+option go_package="xServer/analysis/api/gen/v1;analysispb";
+
+message GetYoYRequest {
+
+}
+
+message GetYoYResponse {
+
+}
+
+message GetMoMRequest {
+
+}
+
+message GetMoMResponse {
+
+}
+
+service AnalysisService {
+    rpc GetYoY (GetYoYRequest) returns (GetYoYResponse);
+    rpc GetMoM (GetMoMRequest) returns (GetMoMResponse);
+}

@@ -1,0 +1,11 @@
+type: google.api.Service
+config_version: 3
+
+http:
+  rules:
+    - selector: hisdata.v1.HisdataService.GetHisData
+      post: /v1/hisdata
+      body: "*"
+    - selector: hisdata.v1.HisdataService.GetRealData
+      post: /v1/realdata
+      body: "*"

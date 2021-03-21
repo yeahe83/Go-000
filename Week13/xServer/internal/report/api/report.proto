@@ -1,0 +1,24 @@
+syntax = "proto3";
+package report.v1;
+option go_package="xServer/report/api/gen/v1;reportapb";
+
+message GetYearReportRequest {
+
+}
+
+message GetYearReportResponse {
+
+}
+
+message GetMonthReportRequest {
+
+}
+
+message GetMonthReportResponse {
+
+}
+
+service ReportService {
+    rpc GetYearReport (GetYearReportRequest) returns (GetYearReportResponse);
+    rpc GetMonthReport (GetMonthReportRequest) returns (GetMonthReportResponse);
+}

@@ -1,0 +1,24 @@
+syntax = "proto3";
+package hisdata.v1;
+option go_package="xServer/hisdata/api/gen/v1;hisdatapb";
+
+message GetHisDataRequest {
+
+}
+
+message GetHisDataResponse {
+
+}
+
+message GetRealRequest {
+
+}
+
+message GetRealResponse {
+
+}
+
+service HisdataService {
+    rpc GetHisData (GetHisDataRequest) returns (GetHisDataResponse);
+    rpc GetRealData (GetRealRequest) returns (GetRealResponse);
+}
